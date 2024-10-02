@@ -2,9 +2,8 @@
 
 package com.example.mindjourney.screens
 
-import android.app.DatePickerDialog
-import android.util.Log
-import android.widget.DatePicker
+import android.app.Activity
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,31 +22,18 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.example.mindjourney.R
-import java.util.Calendar
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.userProfileChangeRequest
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignupScreen(navController: NavHostController) {
+    val context = LocalContext.current
     val name = remember { mutableStateOf("") }
     val email = remember { mutableStateOf("") }
     val password = remember { mutableStateOf("") }
     val confirmPassword = remember { mutableStateOf("") }
-    val birthday = remember { mutableStateOf("") }
-
-    // Get context and current date
-    val context = LocalContext.current
-    val calendar = Calendar.getInstance()
-    val year = calendar.get(Calendar.YEAR)
-    val month = calendar.get(Calendar.MONTH)
-    val day = calendar.get(Calendar.DAY_OF_MONTH)
-
-    // Date picker dialog
-    val datePickerDialog = DatePickerDialog(
-        context,
-        { _: DatePicker, selectedYear: Int, selectedMonth: Int, selectedDay: Int ->
-            birthday.value = "$selectedDay/${selectedMonth + 1}/$selectedYear"
-            Log.d("DatePicker", "Selected date: ${birthday.value}")
-        }, year, month, day
-    )
+    val isLoading = remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -56,6 +42,7 @@ fun SignupScreen(navController: NavHostController) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
+        // Logo
         Image(
             painter = painterResource(id = R.drawable.logo),
             contentDescription = "App Logo",
@@ -63,6 +50,7 @@ fun SignupScreen(navController: NavHostController) {
             contentScale = ContentScale.Fit
         )
 
+        // Card for Signup Form
         Card(
             elevation = CardDefaults.cardElevation(10.dp),
             modifier = Modifier
@@ -74,8 +62,9 @@ fun SignupScreen(navController: NavHostController) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(15.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Name Input
                 OutlinedTextField(
                     value = name.value,
                     onValueChange = { name.value = it },
@@ -91,32 +80,9 @@ fun SignupScreen(navController: NavHostController) {
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Birthday Field with Date Picker
-                OutlinedTextField(
-                    value = birthday.value,
-                    onValueChange = { /* No user input allowed directly */ },
-                    label = { Text("Birthday", fontWeight = FontWeight.Bold) },
-                    readOnly = true, // Make the field read-only so user cannot type
-                    textStyle = LocalTextStyle.current.copy(color = Color.White, fontWeight = FontWeight.Bold),
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                        unfocusedBorderColor = Color.White,
-                        focusedBorderColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.White
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            Log.d("DatePicker", "DatePicker clicked") // Log to confirm click
-                            datePickerDialog.show() // Show the date picker when clicked
-                        }
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
+                // Email Input
                 OutlinedTextField(
                     value = email.value,
                     onValueChange = { email.value = it },
@@ -132,12 +98,13 @@ fun SignupScreen(navController: NavHostController) {
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
+                // Password Input
                 OutlinedTextField(
                     value = password.value,
                     onValueChange = { password.value = it },
-                    label = { Text("Password", fontWeight = FontWeight.Bold) },
+                    label = { Text("Password", color = Color.White, fontWeight = FontWeight.Bold) },
                     textStyle = LocalTextStyle.current.copy(color = Color.White, fontWeight = FontWeight.Bold),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         unfocusedBorderColor = Color.White,
@@ -150,12 +117,13 @@ fun SignupScreen(navController: NavHostController) {
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
+                // Confirm Password Input
                 OutlinedTextField(
                     value = confirmPassword.value,
                     onValueChange = { confirmPassword.value = it },
-                    label = { Text("Confirm Password", fontWeight = FontWeight.Bold) },
+                    label = { Text("Confirm Password", color = Color.White, fontWeight = FontWeight.Bold) },
                     textStyle = LocalTextStyle.current.copy(color = Color.White, fontWeight = FontWeight.Bold),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         unfocusedBorderColor = Color.White,
@@ -170,31 +138,79 @@ fun SignupScreen(navController: NavHostController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Row(){
-                    Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF)),
-                        modifier = Modifier.padding(end = 10.dp),
-                        onClick = { /* Handle login */ }) {
-                        Text("Sign Up", color = Color(0xFF7D5AA0))
+                // Sign Up Button
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF)),
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        if (name.value.isEmpty() || email.value.isEmpty() || password.value.isEmpty() || confirmPassword.value.isEmpty()) {
+                            Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (password.value != confirmPassword.value) {
+                            Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        isLoading.value = true
+                        signUpWithEmailPassword(name.value, email.value, password.value, context as Activity, navController, isLoading)
                     }
+                ) {
+                    Text("Sign Up", color = Color(0xFF7D5AA0))
+                }
 
-                    Button(
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF)),
-                        modifier = Modifier.padding(end = 10.dp),
-                        onClick = {
-                            navController.navigate("Home")
-                        }) {
-                        Text("Cancel", color = Color(0xFF7D5AA0))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Back to Login Button
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF)),
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        navController.navigate("login")
                     }
+                ) {
+                    Text("Back to Login", color = Color(0xFF7D5AA0))
                 }
             }
         }
     }
 }
 
+fun signUpWithEmailPassword(
+    name: String,
+    email: String,
+    password: String,
+    activity: Activity,
+    navController: NavHostController,
+    isLoading: MutableState<Boolean>
+) {
+    val auth = FirebaseAuth.getInstance()
+    auth.createUserWithEmailAndPassword(email, password)
+        .addOnCompleteListener(activity) { task ->
+            isLoading.value = false // Stop loading
+            if (task.isSuccessful) {
+                // User creation was successful, now set the display name
+                val user = auth.currentUser
+                val profileUpdates = userProfileChangeRequest {
+                    displayName = name // Set the display name
+                }
+
+                user?.updateProfile(profileUpdates)?.addOnCompleteListener { profileTask ->
+                    if (profileTask.isSuccessful) {
+                        Toast.makeText(activity, "Sign Up successful", Toast.LENGTH_SHORT).show()
+                        navController.navigate("login") // Navigate to login after sign-up
+                    } else {
+                        Toast.makeText(activity, "Failed to update profile: ${profileTask.exception?.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } else {
+                Toast.makeText(activity, "Sign Up failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+}
+
+
 @Preview(showBackground = true)
 @Composable
 fun PreviewSignupScreen() {
-    val navController = rememberNavController()
-    SignupScreen(navController)
+    SignupScreen(rememberNavController())
 }
