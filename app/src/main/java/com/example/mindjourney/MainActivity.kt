@@ -1,5 +1,7 @@
 package com.example.mindjourney
 
+import RecordScreen
+import ThoughtsScreen
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -8,8 +10,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.navigation.compose.*
-import com.example.mindjourney.screens.* // Import your existing screens
+import com.example.mindjourney.screens.*
 import com.example.mindjourney.ui.theme.MindJourneyTheme
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
@@ -34,14 +37,15 @@ class MainActivity : ComponentActivity() {
 
         // Configure Google Sign-in options
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(R.string.web_client_id)) // Make sure this is the Web client ID
+            .requestIdToken(getString(R.string.web_client_id))
             .requestEmail()
             .build()
 
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
+        // Set content with MainApp composable and pass ViewModelStoreOwner (in this case, `this`)
         setContent {
-            MainApp(auth, googleSignInClient)
+            MainApp(auth, googleSignInClient, this)
         }
     }
 
@@ -57,10 +61,11 @@ class MainActivity : ComponentActivity() {
     private fun handleSignInResult(completedTask: Task<GoogleSignInAccount>) {
         try {
             val account = completedTask.getResult(ApiException::class.java)
-            // Signed in successfully, authenticate with Firebase
-            firebaseAuthWithGoogle(account.idToken!!)
+            if (account != null) {
+                // Signed in successfully, authenticate with Firebase
+                firebaseAuthWithGoogle(account.idToken!!)
+            }
         } catch (e: ApiException) {
-            // Sign in failed
             Log.e("Sign in error", "Google Sign-In failed with error: ${e.statusCode}, message: ${e.message}")
             Toast.makeText(this, "Google Sign In Failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
@@ -71,14 +76,11 @@ class MainActivity : ComponentActivity() {
         auth.signInWithCredential(credential)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-                    // Sign-in success
                     Toast.makeText(this, "Login successful", Toast.LENGTH_LONG).show()
-                    // Navigate to dashboard after successful login
                     setContent {
-                        MainApp(auth, googleSignInClient)
+                        MainApp(auth, googleSignInClient, this)
                     }
                 } else {
-                    // Sign-in failed
                     Toast.makeText(this, "Login failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                 }
             }
@@ -90,7 +92,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainApp(auth: FirebaseAuth, googleSignInClient: GoogleSignInClient) {
+fun MainApp(auth: FirebaseAuth, googleSignInClient: GoogleSignInClient, viewModelStoreOwner: ViewModelStoreOwner) {
     val navController = rememberNavController()
     val firebaseAuth = FirebaseAuth.getInstance()
     val currentUser = firebaseAuth.currentUser
@@ -103,8 +105,9 @@ fun MainApp(auth: FirebaseAuth, googleSignInClient: GoogleSignInClient) {
         )
     }
 
-    // Check if user is logged in and set the start destination accordingly
+    // Safety check and logging for start destination
     val startDestination = if (auth.currentUser != null) "dashboard" else "home"
+    Log.d("MainApp", "Start destination set to $startDestination")
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable("home") { HomepageScreen(navController) }
@@ -112,18 +115,23 @@ fun MainApp(auth: FirebaseAuth, googleSignInClient: GoogleSignInClient) {
         composable("signup") { SignupScreen(navController) }
         composable("dashboard") { DashboardScreen(navController) }
         composable("record") { RecordScreen(navController) }
-        composable("account") { Account(navController, user) {
-            // Sign out logic can be placed here
-            auth.signOut()
-            navController.navigate("home") // Navigate back to home after sign-out
-        }}
+        composable("thoughts") { ThoughtsScreen(navController) }
+        composable("account") {
+            Account(navController) {
+                auth.signOut()
+                navController.navigate("home") {
+                    popUpTo("dashboard") { inclusive = true }
+                }
+            }
+        }
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview() {
-    MindJourneyTheme {
-        MainApp(FirebaseAuth.getInstance(), GoogleSignIn.getClient(MainActivity(), GoogleSignInOptions.DEFAULT_SIGN_IN))
-    }
-}
+
+//@Preview(showBackground = true)
+//@Composable
+//fun DefaultPreview() {
+//    MindJourneyTheme {
+//        MainApp(FirebaseAuth.getInstance(), GoogleSignIn.getClient(MainActivity(), GoogleSignInOptions.DEFAULT_SIGN_IN))
+//    }
+//}
