@@ -111,6 +111,7 @@ fun MainApp(auth: FirebaseAuth, googleSignInClient: GoogleSignInClient) {
         composable("home") { HomepageScreen(navController) }
         composable("login") { LoginScreen(navController, auth, googleSignInClient) }
         composable("signup") { SignupScreen(navController) }
+        composable("mood") { MoodScreen(navController)  }
         composable("dashboard") { DashboardScreen(navController) }
         composable("record") { RecordScreen(navController) }
         composable("thoughts") { ThoughtsScreen(navController )  }
