@@ -3,14 +3,16 @@
 package com.example.mindjourney.screens
 
 import android.app.Activity
+import android.util.Patterns
 import android.widget.Toast
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -34,6 +36,12 @@ fun SignupScreen(navController: NavHostController) {
     val password = remember { mutableStateOf("") }
     val confirmPassword = remember { mutableStateOf("") }
     val isLoading = remember { mutableStateOf(false) }
+    val errorMessage = remember { mutableStateOf<String?>(null) }
+
+    val focusRequesterName = remember { FocusRequester() }
+    val focusRequesterEmail = remember { FocusRequester() }
+    val focusRequesterPassword = remember { FocusRequester() }
+    val focusRequesterConfirmPassword = remember { FocusRequester() }
 
     Column(
         modifier = Modifier
@@ -67,8 +75,12 @@ fun SignupScreen(navController: NavHostController) {
                 // Name Input
                 OutlinedTextField(
                     value = name.value,
-                    onValueChange = { name.value = it },
+                    onValueChange = {
+                        name.value = it
+                        errorMessage.value = null // Clear error when user types
+                    },
                     label = { Text("Name", fontWeight = FontWeight.Bold) },
+                    isError = errorMessage.value?.contains("name", ignoreCase = true) == true,
                     textStyle = LocalTextStyle.current.copy(color = Color.White, fontWeight = FontWeight.Bold),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         unfocusedBorderColor = Color.White,
@@ -77,7 +89,9 @@ fun SignupScreen(navController: NavHostController) {
                         focusedLabelColor = Color.White,
                         unfocusedLabelColor = Color.White
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequesterName)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -85,8 +99,12 @@ fun SignupScreen(navController: NavHostController) {
                 // Email Input
                 OutlinedTextField(
                     value = email.value,
-                    onValueChange = { email.value = it },
+                    onValueChange = {
+                        email.value = it
+                        errorMessage.value = null // Clear error when user types
+                    },
                     label = { Text("Email", fontWeight = FontWeight.Bold) },
+                    isError = errorMessage.value?.contains("email", ignoreCase = true) == true,
                     textStyle = LocalTextStyle.current.copy(color = Color.White, fontWeight = FontWeight.Bold),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         unfocusedBorderColor = Color.White,
@@ -95,7 +113,9 @@ fun SignupScreen(navController: NavHostController) {
                         focusedLabelColor = Color.White,
                         unfocusedLabelColor = Color.White
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequesterEmail)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -103,8 +123,12 @@ fun SignupScreen(navController: NavHostController) {
                 // Password Input
                 OutlinedTextField(
                     value = password.value,
-                    onValueChange = { password.value = it },
+                    onValueChange = {
+                        password.value = it
+                        errorMessage.value = null // Clear error when user types
+                    },
                     label = { Text("Password", color = Color.White, fontWeight = FontWeight.Bold) },
+                    isError = errorMessage.value?.contains("password", ignoreCase = true) == true,
                     textStyle = LocalTextStyle.current.copy(color = Color.White, fontWeight = FontWeight.Bold),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         unfocusedBorderColor = Color.White,
@@ -114,7 +138,9 @@ fun SignupScreen(navController: NavHostController) {
                         unfocusedLabelColor = Color.White
                     ),
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequesterPassword)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -122,8 +148,12 @@ fun SignupScreen(navController: NavHostController) {
                 // Confirm Password Input
                 OutlinedTextField(
                     value = confirmPassword.value,
-                    onValueChange = { confirmPassword.value = it },
+                    onValueChange = {
+                        confirmPassword.value = it
+                        errorMessage.value = null // Clear error when user types
+                    },
                     label = { Text("Confirm Password", color = Color.White, fontWeight = FontWeight.Bold) },
+                    isError = errorMessage.value?.contains("confirm password", ignoreCase = true) == true,
                     textStyle = LocalTextStyle.current.copy(color = Color.White, fontWeight = FontWeight.Bold),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         unfocusedBorderColor = Color.White,
@@ -133,8 +163,22 @@ fun SignupScreen(navController: NavHostController) {
                         unfocusedLabelColor = Color.White
                     ),
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequesterConfirmPassword)
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Error Message Text
+                if (errorMessage.value != null) {
+                    Text(
+                        text = errorMessage.value!!,
+                        color = Color.Red,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -143,12 +187,34 @@ fun SignupScreen(navController: NavHostController) {
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF)),
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
-                        if (name.value.isEmpty() || email.value.isEmpty() || password.value.isEmpty() || confirmPassword.value.isEmpty()) {
-                            Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                        if (name.value.isEmpty()) {
+                            errorMessage.value = "Please enter your name."
+                            focusRequesterName.requestFocus()
+                            return@Button
+                        }
+                        if (email.value.isEmpty()) {
+                            errorMessage.value = "Please enter your email."
+                            focusRequesterEmail.requestFocus()
+                            return@Button
+                        }
+                        if (!Patterns.EMAIL_ADDRESS.matcher(email.value).matches()) {
+                            errorMessage.value = "Please enter a valid email address."
+                            focusRequesterEmail.requestFocus()
+                            return@Button
+                        }
+                        if (password.value.isEmpty()) {
+                            errorMessage.value = "Please enter your password."
+                            focusRequesterPassword.requestFocus()
+                            return@Button
+                        }
+                        if (confirmPassword.value.isEmpty()) {
+                            errorMessage.value = "Please confirm your password."
+                            focusRequesterConfirmPassword.requestFocus()
                             return@Button
                         }
                         if (password.value != confirmPassword.value) {
-                            Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                            errorMessage.value = "Passwords do not match."
+                            focusRequesterPassword.requestFocus()
                             return@Button
                         }
                         isLoading.value = true
@@ -207,7 +273,6 @@ fun signUpWithEmailPassword(
             }
         }
 }
-
 
 @Preview(showBackground = true)
 @Composable

@@ -1,5 +1,6 @@
 package com.example.mindjourney
 
+import AccountScreen
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -112,7 +113,8 @@ fun MainApp(auth: FirebaseAuth, googleSignInClient: GoogleSignInClient) {
         composable("signup") { SignupScreen(navController) }
         composable("dashboard") { DashboardScreen(navController) }
         composable("record") { RecordScreen(navController) }
-        composable("account") { Account(navController, user) {
+        composable("thoughts") { ThoughtsScreen(navController )  }
+        composable("account") { AccountScreen(navController) {
             // Sign out logic can be placed here
             auth.signOut()
             navController.navigate("home") // Navigate back to home after sign-out

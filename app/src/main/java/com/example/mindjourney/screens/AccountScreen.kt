@@ -1,6 +1,3 @@
-package com.example.mindjourney.screens
-
-import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -29,12 +26,24 @@ import coil.compose.rememberImagePainter // Make sure to include Coil for image 
 
 import com.example.mindjourney.R
 import com.example.mindjourney.components.BottomNavBar
+import com.example.mindjourney.screens.User
 import com.example.mindjourney.ui.theme.Purple40
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
-fun Account(navController: NavHostController, user: User?, onSignOut: () -> Unit) {
+fun AccountScreen(navController: NavHostController, function: () -> Unit) {
     // Default user icon drawable resource (you can replace this with your own icon)
     val defaultIcon = painterResource(id = R.drawable.icon)
+    val currentUser = FirebaseAuth.getInstance().currentUser
+
+    val user = currentUser?.let {
+        User(
+            name = it.displayName ?: "No Name",
+            email = it.email ?: "No Email",
+            profilePictureUrl = it.photoUrl?.toString()
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -50,7 +59,7 @@ fun Account(navController: NavHostController, user: User?, onSignOut: () -> Unit
                 .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)), // Updated for Material3
             contentAlignment = Alignment.Center,
 
-        ) {
+            ) {
             if (user?.profilePictureUrl != null) {
                 // Load user's profile picture (using Coil, Glide, etc.)
                 Image(
@@ -89,7 +98,10 @@ fun Account(navController: NavHostController, user: User?, onSignOut: () -> Unit
 
         // Sign-out button
         Button(
-            onClick = onSignOut,
+            onClick = {
+                FirebaseAuth.getInstance().signOut()  // Perform the sign-out operation
+                navController.navigate("home")  // Navigate to home after sign-out
+            },
             colors = ButtonDefaults.buttonColors(
                 Purple40
             ),
@@ -106,10 +118,3 @@ fun Account(navController: NavHostController, user: User?, onSignOut: () -> Unit
         BottomNavBar(navController)
     }
 }
-
-// Sample User data class (you can adjust it to fit your model)
-data class User(
-    val name: String,
-    val email: String,
-    val profilePictureUrl: String? // Nullable for cases without a profile picture
-)

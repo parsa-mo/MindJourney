@@ -3,7 +3,7 @@
 package com.example.mindjourney.screens
 
 import android.app.Activity
-import android.util.Log
+import android.util.Patterns
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -24,7 +26,7 @@ import com.example.mindjourney.MainActivity
 import com.example.mindjourney.R
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.firebase.auth.FirebaseAuth
-
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +39,12 @@ fun LoginScreen(
     val email = remember { mutableStateOf("") }
     val password = remember { mutableStateOf("") }
     val isLoading = remember { mutableStateOf(false) }
+    val errorMessage = remember { mutableStateOf<String?>(null) }
+
+    val focusRequesterEmail = remember { FocusRequester() }
+    val focusRequesterPassword = remember { FocusRequester() }
+
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -70,8 +78,12 @@ fun LoginScreen(
                 // Email Input
                 OutlinedTextField(
                     value = email.value,
-                    onValueChange = { email.value = it },
+                    onValueChange = {
+                        email.value = it
+                        errorMessage.value = null // Clear error when user types
+                    },
                     label = { Text("Email", fontWeight = FontWeight.Bold) },
+                    isError = errorMessage.value?.contains("email", ignoreCase = true) == true,
                     textStyle = LocalTextStyle.current.copy(color = Color.White, fontWeight = FontWeight.Bold),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         unfocusedBorderColor = Color.White,
@@ -80,7 +92,9 @@ fun LoginScreen(
                         focusedLabelColor = Color.White,
                         unfocusedLabelColor = Color.White
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequesterEmail)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -88,8 +102,12 @@ fun LoginScreen(
                 // Password Input
                 OutlinedTextField(
                     value = password.value,
-                    onValueChange = { password.value = it },
-                    label = { Text("Password", color = Color.White, fontWeight = FontWeight.Bold) },
+                    onValueChange = {
+                        password.value = it
+                        errorMessage.value = null // Clear error when user types
+                    },
+                    label = { Text("Password", fontWeight = FontWeight.Bold, color = Color.White) },
+                    isError = errorMessage.value?.contains("password", ignoreCase = true) == true,
                     textStyle = LocalTextStyle.current.copy(color = Color.White, fontWeight = FontWeight.Bold),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         unfocusedBorderColor = Color.White,
@@ -99,8 +117,22 @@ fun LoginScreen(
                         unfocusedLabelColor = Color.White
                     ),
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequesterPassword)
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Error Message Text
+                if (errorMessage.value != null) {
+                    Text(
+                        text = errorMessage.value!!,
+                        color = Color.Red,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -110,22 +142,41 @@ fun LoginScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF)),
                         modifier = Modifier.padding(end = 10.dp),
                         onClick = {
-                            if (email.value.isEmpty() || password.value.isEmpty()) {
-                                Toast.makeText(context, "Please fill in both fields", Toast.LENGTH_SHORT).show()
+                            if (email.value.isEmpty()) {
+                                errorMessage.value = "Please enter your email."
+                                focusRequesterEmail.requestFocus()
                                 return@Button
                             }
+                            if (!Patterns.EMAIL_ADDRESS.matcher(email.value).matches()) {
+                                errorMessage.value = "Please enter a valid email address."
+                                focusRequesterEmail.requestFocus()
+                                return@Button
+                            }
+                            if (password.value.isEmpty()) {
+                                errorMessage.value = "Please enter your password."
+                                focusRequesterPassword.requestFocus()
+                                return@Button
+                            }
+
+                            // Sign in with email and password
                             isLoading.value = true
-                            signInWithEmailPassword(
-                                auth,
-                                email.value,
-                                password.value,
-                                context as Activity,
-                                navController,
-                                isLoading
-                            ) { user ->
-                                // Handle successful login here, e.g., navigate to the dashboard or show user info
-                                Toast.makeText(context, "Welcome, ${user.name}!", Toast.LENGTH_SHORT).show()
-                                navController.navigate("dashboard")
+                            coroutineScope.launch {
+                                signInWithEmailPassword(
+                                    auth,
+                                    email.value,
+                                    password.value,
+                                    context as Activity,
+                                    navController,
+                                    isLoading,
+                                    { user ->
+                                        // Handle successful login here, e.g., navigate to the dashboard or show user info
+                                        Toast.makeText(context, "Welcome, ${user.name}!", Toast.LENGTH_SHORT).show()
+                                        navController.navigate("dashboard")
+                                    },
+                                    { error ->
+                                        errorMessage.value = error
+                                    }
+                                )
                             }
                         }
                     ) {
@@ -180,7 +231,8 @@ fun signInWithEmailPassword(
     activity: Activity,
     navController: NavHostController,
     isLoading: MutableState<Boolean>,
-    onLoginSuccess: (User) -> Unit // Callback to handle successful login
+    onLoginSuccess: (User) -> Unit, // Callback to handle successful login
+    onLoginFailure: (String) -> Unit // Callback to handle login failure
 ) {
     auth.signInWithEmailAndPassword(email, password)
         .addOnCompleteListener(activity) { task ->
@@ -188,30 +240,23 @@ fun signInWithEmailPassword(
             if (task.isSuccessful) {
                 val currentUser = auth.currentUser
 
-                // Log the current user details
                 if (currentUser != null) {
-                    // Access and log specific user properties
                     val userId = currentUser.uid
-                    val userName = currentUser.displayName ?: "No display name"
-                    val userEmail = currentUser.email ?: "No email"
+                    val userName = currentUser.displayName ?: "User"
+                    val userEmail = currentUser.email ?: ""
 
-                    Log.d("Login", "User ID: $userId") // Log the user ID
-                    Log.d("Login", "User Name: $userName") // Log the display name
-                    Log.d("Login", "User Email: $userEmail") // Log the email
-
-                    // Create user object and proceed
                     val user = User(name = userName, email = userEmail, profilePictureUrl = null)
 
                     Toast.makeText(activity, "Login successful", Toast.LENGTH_SHORT).show()
-                    onLoginSuccess(user) // Call the callback with the user object
-                } else {
-                    Toast.makeText(
-                        activity,
-                        "Login failed: ${task.exception?.message}",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    onLoginSuccess(user)
                 }
+            } else {
+                val errorMessage = when {
+                    task.exception?.message?.contains("password") == true -> "Incorrect password."
+                    task.exception?.message?.contains("no user record") == true -> "Account does not exist."
+                    else -> "Login failed: ${task.exception?.message}"
+                }
+                onLoginFailure(errorMessage)
             }
         }
 }
-
